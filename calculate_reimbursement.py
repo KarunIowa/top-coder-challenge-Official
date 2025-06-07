@@ -6,78 +6,81 @@ import math
 def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_amount):
     """
     Reverse-engineered reimbursement calculation 
-    Based on extreme case analysis showing heavy receipt penalties
+    Balanced model based on comprehensive analysis
     """
     
     days = int(trip_duration_days)
     miles = float(miles_traveled)
     receipts = float(total_receipts_amount)
     
-    # Base per diem model - appears to be around $75/day
+    # Base model: $75/day + $0.30/mile
     base_per_diem = 75 * days
-    
-    # Mileage calculation - around $0.30/mile base rate
     mileage_amount = 0.30 * miles
     
-    # Receipt handling - CRITICAL INSIGHT: High receipts get heavily penalized
-    if receipts <= 200:
-        # Low receipts get good treatment
-        receipt_contribution = receipts * 0.5
-    elif receipts <= 500:
-        # Medium receipts get moderate treatment  
-        receipt_contribution = 200 * 0.5 + (receipts - 200) * 0.3
-    elif receipts <= 1000:
-        # Higher receipts start getting penalized
-        receipt_contribution = 200 * 0.5 + 300 * 0.3 + (receipts - 500) * 0.2
-    elif receipts <= 1500:
-        # High receipts get more penalty
-        receipt_contribution = 200 * 0.5 + 300 * 0.3 + 500 * 0.2 + (receipts - 1000) * 0.1
+    # Receipt handling - the key insight is that high mileage justifies high receipts
+    miles_per_day = miles / days if days > 0 else 0
+    
+    # Calculate receipt rate based on work intensity (miles)
+    if miles < 200:
+        # Low mileage trips get lower receipt rates
+        if receipts <= 500:
+            receipt_rate = 0.4
+        elif receipts <= 1000:
+            receipt_rate = 0.3
+        else:
+            receipt_rate = 0.1  # Heavy penalty for high receipts with low work
+    elif miles < 500:
+        # Medium mileage trips get moderate rates
+        if receipts <= 1000:
+            receipt_rate = 0.5
+        elif receipts <= 1500:
+            receipt_rate = 0.4
+        else:
+            receipt_rate = 0.2
     else:
-        # Very high receipts (>$1500) get almost nothing additional
-        receipt_contribution = 200 * 0.5 + 300 * 0.3 + 500 * 0.2 + 500 * 0.1 + (receipts - 1500) * 0.02
+        # High mileage trips can justify high receipts
+        if receipts <= 1500:
+            receipt_rate = 0.6
+        elif receipts <= 2000:
+            receipt_rate = 0.5
+        else:
+            receipt_rate = 0.4  # Still good rate even for very high receipts
+    
+    receipt_contribution = receipts * receipt_rate
     
     # Base calculation
     total = base_per_diem + mileage_amount + receipt_contribution
     
-    # Efficiency bonuses and penalties
-    if days > 0:
-        miles_per_day = miles / days
-        
-        # Kevin's efficiency insights - moderate miles per day is optimal
-        if 80 <= miles_per_day <= 150:
-            total += 50  # Efficiency bonus
-        elif miles_per_day > 300:
-            # Very high miles per day gets penalized (like the 1-day 1082 mile case)
-            total *= 0.7
-        elif miles_per_day < 20:
-            total += 30  # Low mileage bonus
+    # Additional bonuses and adjustments based on interview insights
     
-    # Trip duration effects from interviews
+    # 5-day bonus (mentioned multiple times in interviews)
     if days == 5:
-        # 5-day bonus mentioned multiple times
         total += 100
-    elif days == 1:
-        # 1-day trips seem to get slight bonus for low expenses
-        if receipts < 100:
-            total += 30
+    
+    # Efficiency bonuses for optimal ranges (Kevin's insights)
+    if 80 <= miles_per_day <= 200:
+        total += 50
+    elif miles_per_day > 400:
+        # Very high efficiency gets bonus (high-work single days)
+        total += 100
+    
+    # Trip duration adjustments
+    if days == 1:
+        # 1-day trips get bonus for being efficient
+        total += 50
     elif days >= 10:
-        # Long trips get penalized
-        total *= 0.9
+        # Long trips get slight penalty
+        total *= 0.95
     
-    # Additional penalties for extreme cases
-    if receipts > 2000:
-        # Extreme receipt penalty (like the $2321 case)
-        total *= 0.6
-    
-    if days == 1 and miles > 800:
-        # Extreme single-day mileage penalty
-        total *= 0.6
-    
-    # Small receipt penalty mentioned by Dave
+    # Small receipt penalty (Dave's observation)
     if receipts < 50:
-        total -= 20
+        total -= 30
     
-    # Ensure reasonable minimum
+    # Final edge case handling
+    # Only penalize the truly problematic cases (very high receipts with very low work)
+    if receipts > 2000 and miles < 100:
+        total *= 0.5  # This targets the real outliers like 4d, 69mi, $2321
+    
     return round(max(total, 50), 2)
 
 if __name__ == "__main__":
