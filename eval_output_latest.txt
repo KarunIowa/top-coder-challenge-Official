@@ -1,0 +1,6 @@
+🧾 Black Box Challenge - Reimbursement System Evaluation
+=======================================================
+
+📊 Running evaluation against 1,000 test cases...
+
+Extracting test data...
