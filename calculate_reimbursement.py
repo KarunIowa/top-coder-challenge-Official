@@ -2,105 +2,83 @@
 
 import sys
 import math
-import pickle
-import numpy as np
-
-# Try to load the trained model, fall back to simple model if not available
-try:
-    with open('/app/trained_model.pkl', 'rb') as f:
-        trained_model = pickle.load(f)
-    use_ml_model = True
-except:
-    use_ml_model = False
-
-def extract_features(days, miles, receipts):
-    """Extract features for ML model"""
-    miles_per_day = miles / days if days > 0 else 0
-    receipts_per_day = receipts / days if days > 0 else 0
-    
-    features = [
-        days,
-        miles,
-        receipts,
-        miles_per_day,
-        receipts_per_day,
-        days * days,  # Non-linear day effects
-        miles * miles,  # Non-linear mile effects
-        receipts * receipts,  # Non-linear receipt effects
-        days * miles,  # Interaction effects
-        days * receipts,
-        miles * receipts,
-        1 if days == 5 else 0,  # 5-day bonus flag
-        1 if receipts < 50 else 0,  # Small receipt flag
-        1 if receipts > 1500 else 0,  # Large receipt flag
-        1 if miles_per_day > 200 else 0,  # High efficiency flag
-    ]
-    
-    return features
 
 def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_amount):
     """
-    Reverse-engineered reimbursement calculation using ML model
+    Reverse-engineered reimbursement calculation 
+    Based on extreme case analysis showing heavy receipt penalties
     """
     
     days = int(trip_duration_days)
     miles = float(miles_traveled)
     receipts = float(total_receipts_amount)
     
-    if use_ml_model:
-        # Use trained ML model
-        features = extract_features(days, miles, receipts)
-        prediction = trained_model.predict([features])[0]
-        return round(max(prediction, 50), 2)
+    # Base per diem model - appears to be around $75/day
+    base_per_diem = 75 * days
+    
+    # Mileage calculation - around $0.30/mile base rate
+    mileage_amount = 0.30 * miles
+    
+    # Receipt handling - CRITICAL INSIGHT: High receipts get heavily penalized
+    if receipts <= 200:
+        # Low receipts get good treatment
+        receipt_contribution = receipts * 0.5
+    elif receipts <= 500:
+        # Medium receipts get moderate treatment  
+        receipt_contribution = 200 * 0.5 + (receipts - 200) * 0.3
+    elif receipts <= 1000:
+        # Higher receipts start getting penalized
+        receipt_contribution = 200 * 0.5 + 300 * 0.3 + (receipts - 500) * 0.2
+    elif receipts <= 1500:
+        # High receipts get more penalty
+        receipt_contribution = 200 * 0.5 + 300 * 0.3 + 500 * 0.2 + (receipts - 1000) * 0.1
     else:
-        # Fallback to improved hand-crafted model based on ML insights
-        # The ML model showed interaction effects are very important
+        # Very high receipts (>$1500) get almost nothing additional
+        receipt_contribution = 200 * 0.5 + 300 * 0.3 + 500 * 0.2 + 500 * 0.1 + (receipts - 1500) * 0.02
+    
+    # Base calculation
+    total = base_per_diem + mileage_amount + receipt_contribution
+    
+    # Efficiency bonuses and penalties
+    if days > 0:
+        miles_per_day = miles / days
         
-        # Base components
-        base_amount = 50 * days  # Low base
-        mileage_amount = 0.3 * miles  # Lower mileage rate
-        
-        # Receipt handling - non-linear based on ML insights with heavy penalties for high amounts
-        if receipts <= 500:
-            receipt_amount = receipts * 0.4
-        elif receipts <= 1000:
-            receipt_amount = 500 * 0.4 + (receipts - 500) * 0.6
-        elif receipts <= 1500:
-            receipt_amount = 500 * 0.4 + 500 * 0.6 + (receipts - 1000) * 0.3
-        else:
-            # Very heavy penalty for high receipts (as seen in error analysis)
-            receipt_amount = 500 * 0.4 + 500 * 0.6 + 500 * 0.3 + (receipts - 1500) * 0.05
-        
-        # Interaction effects (most important from ML)
-        interaction_1 = (days * miles) * 0.02  # days*miles was important
-        interaction_2 = (days * receipts) * 0.001  # days*receipts was important
-        interaction_3 = (receipts * receipts) * 0.00001  # receipts² was important
-        
-        total = base_amount + mileage_amount + receipt_amount + interaction_1 + interaction_2 + interaction_3
-        
-        # Special handling for extreme cases based on error analysis
-        if receipts > 1800:
-            # Extreme receipt penalty
-            total *= 0.4
-        elif receipts > 1500:
-            total *= 0.6
-            
-        # Extreme mileage handling
-        if days == 1 and miles > 800:
-            # 1-day very high mileage gets penalized heavily
-            total *= 0.5
-        elif miles > 1000:
+        # Kevin's efficiency insights - moderate miles per day is optimal
+        if 80 <= miles_per_day <= 150:
+            total += 50  # Efficiency bonus
+        elif miles_per_day > 300:
+            # Very high miles per day gets penalized (like the 1-day 1082 mile case)
             total *= 0.7
-        
-        # 5-day bonus (was flagged as important)
-        if days == 5:
-            total += 50
-            
-        # Small receipt penalty
-        if receipts < 50:
-            total -= 30
-            
-        return round(max(total, 50), 2)
+        elif miles_per_day < 20:
+            total += 30  # Low mileage bonus
+    
+    # Trip duration effects from interviews
+    if days == 5:
+        # 5-day bonus mentioned multiple times
+        total += 100
+    elif days == 1:
+        # 1-day trips seem to get slight bonus for low expenses
+        if receipts < 100:
+            total += 30
+    elif days >= 10:
+        # Long trips get penalized
+        total *= 0.9
+    
+    # Additional penalties for extreme cases
+    if receipts > 2000:
+        # Extreme receipt penalty (like the $2321 case)
+        total *= 0.6
+    
+    if days == 1 and miles > 800:
+        # Extreme single-day mileage penalty
+        total *= 0.6
+    
+    # Small receipt penalty mentioned by Dave
+    if receipts < 50:
+        total -= 20
+    
+    # Ensure reasonable minimum
+    return round(max(total, 50), 2)
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:
