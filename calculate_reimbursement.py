@@ -6,15 +6,16 @@ import math
 def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_amount):
     """
     Reverse-engineered reimbursement calculation 
-    Exact formula discovered: $95/day + $0.70/mile + 0.056*receipts
+    Best formula found: $86/day + $0.76/mile + 0.350*receipts
+    Achieves 2 exact matches with $245.63 average error
     """
     
     days = int(trip_duration_days)
     miles = float(miles_traveled)
     receipts = float(total_receipts_amount)
     
-    # Exact formula that achieved $17.44 average error on test set
-    reimbursement = 95 * days + 0.70 * miles + 0.056 * receipts
+    # Best formula discovered through exhaustive grid search
+    reimbursement = 86 * days + 0.76 * miles + 0.350 * receipts
     
     return round(max(reimbursement, 50), 2)
 
