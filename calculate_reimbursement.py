@@ -60,13 +60,16 @@ def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_a
         base_amount = 50 * days  # Low base
         mileage_amount = 0.3 * miles  # Lower mileage rate
         
-        # Receipt handling - non-linear based on ML insights  
+        # Receipt handling - non-linear based on ML insights with heavy penalties for high amounts
         if receipts <= 500:
             receipt_amount = receipts * 0.4
         elif receipts <= 1000:
             receipt_amount = 500 * 0.4 + (receipts - 500) * 0.6
-        else:
+        elif receipts <= 1500:
             receipt_amount = 500 * 0.4 + 500 * 0.6 + (receipts - 1000) * 0.3
+        else:
+            # Very heavy penalty for high receipts (as seen in error analysis)
+            receipt_amount = 500 * 0.4 + 500 * 0.6 + 500 * 0.3 + (receipts - 1500) * 0.05
         
         # Interaction effects (most important from ML)
         interaction_1 = (days * miles) * 0.02  # days*miles was important
@@ -74,6 +77,20 @@ def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_a
         interaction_3 = (receipts * receipts) * 0.00001  # receipts² was important
         
         total = base_amount + mileage_amount + receipt_amount + interaction_1 + interaction_2 + interaction_3
+        
+        # Special handling for extreme cases based on error analysis
+        if receipts > 1800:
+            # Extreme receipt penalty
+            total *= 0.4
+        elif receipts > 1500:
+            total *= 0.6
+            
+        # Extreme mileage handling
+        if days == 1 and miles > 800:
+            # 1-day very high mileage gets penalized heavily
+            total *= 0.5
+        elif miles > 1000:
+            total *= 0.7
         
         # 5-day bonus (was flagged as important)
         if days == 5:
