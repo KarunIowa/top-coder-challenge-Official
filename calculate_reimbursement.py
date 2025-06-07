@@ -17,34 +17,42 @@ def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_a
     base_per_diem = 75 * days
     mileage_amount = 0.30 * miles
     
-    # Receipt handling - the key insight is that high mileage justifies high receipts
+    # Receipt handling - the key insight is that trip length can also justify receipts
     miles_per_day = miles / days if days > 0 else 0
     
-    # Calculate receipt rate based on work intensity (miles)
-    if miles < 200:
-        # Low mileage trips get lower receipt rates
+    # Calculate receipt rate based on work intensity (miles + trip length)
+    work_factor = miles + (days * 50)  # Combined work factor
+    
+    if work_factor < 300:
+        # Low work trips get lower receipt rates
         if receipts <= 500:
             receipt_rate = 0.4
         elif receipts <= 1000:
             receipt_rate = 0.3
         else:
-            receipt_rate = 0.1  # Heavy penalty for high receipts with low work
-    elif miles < 500:
-        # Medium mileage trips get moderate rates
+            receipt_rate = 0.15  # Penalty for high receipts with low work
+    elif work_factor < 600:
+        # Medium work trips get moderate rates
         if receipts <= 1000:
             receipt_rate = 0.5
         elif receipts <= 1500:
             receipt_rate = 0.4
+        elif receipts <= 2000:
+            receipt_rate = 0.3
         else:
             receipt_rate = 0.2
     else:
-        # High mileage trips can justify high receipts
+        # High work trips can justify high receipts
         if receipts <= 1500:
             receipt_rate = 0.6
         elif receipts <= 2000:
             receipt_rate = 0.5
         else:
             receipt_rate = 0.4  # Still good rate even for very high receipts
+    
+    # Special case: long trips (5+ days) get better receipt treatment
+    if days >= 5:
+        receipt_rate = min(receipt_rate + 0.1, 0.6)  # Bonus for long trips
     
     receipt_contribution = receipts * receipt_rate
     
