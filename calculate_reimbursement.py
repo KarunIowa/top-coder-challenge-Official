@@ -2,62 +2,88 @@
 
 import sys
 import math
+import pickle
+import numpy as np
+
+# Try to load the trained model, fall back to simple model if not available
+try:
+    with open('/app/trained_model.pkl', 'rb') as f:
+        trained_model = pickle.load(f)
+    use_ml_model = True
+except:
+    use_ml_model = False
+
+def extract_features(days, miles, receipts):
+    """Extract features for ML model"""
+    miles_per_day = miles / days if days > 0 else 0
+    receipts_per_day = receipts / days if days > 0 else 0
+    
+    features = [
+        days,
+        miles,
+        receipts,
+        miles_per_day,
+        receipts_per_day,
+        days * days,  # Non-linear day effects
+        miles * miles,  # Non-linear mile effects
+        receipts * receipts,  # Non-linear receipt effects
+        days * miles,  # Interaction effects
+        days * receipts,
+        miles * receipts,
+        1 if days == 5 else 0,  # 5-day bonus flag
+        1 if receipts < 50 else 0,  # Small receipt flag
+        1 if receipts > 1500 else 0,  # Large receipt flag
+        1 if miles_per_day > 200 else 0,  # High efficiency flag
+    ]
+    
+    return features
 
 def calculate_reimbursement(trip_duration_days, miles_traveled, total_receipts_amount):
     """
-    Reverse-engineered reimbursement calculation 
-    New model based on deeper analysis
+    Reverse-engineered reimbursement calculation using ML model
     """
     
     days = int(trip_duration_days)
     miles = float(miles_traveled)
     receipts = float(total_receipts_amount)
     
-    # Start with a much lower base - the original estimates were too high
-    base_per_diem = 50 * days  # Much lower base
-    
-    # Mileage with more complex rules
-    if miles <= 100:
-        mileage_amount = miles * 0.8  # Higher rate for low mileage
-    elif miles <= 300:
-        mileage_amount = 100 * 0.8 + (miles - 100) * 0.5
-    elif miles <= 600:
-        mileage_amount = 100 * 0.8 + 200 * 0.5 + (miles - 300) * 0.3  
+    if use_ml_model:
+        # Use trained ML model
+        features = extract_features(days, miles, receipts)
+        prediction = trained_model.predict([features])[0]
+        return round(max(prediction, 50), 2)
     else:
-        mileage_amount = 100 * 0.8 + 200 * 0.5 + 300 * 0.3 + (miles - 600) * 0.6  # Higher again for very high mileage
-    
-    # Receipt handling with heavy penalties for high amounts
-    if receipts <= 100:
-        receipt_amount = receipts * 0.8  # Good rate for low receipts
-    elif receipts <= 500:
-        receipt_amount = 100 * 0.8 + (receipts - 100) * 0.2  # Heavy penalty for medium receipts
-    elif receipts <= 1000:
-        receipt_amount = 100 * 0.8 + 400 * 0.2 + (receipts - 500) * 0.4  # Better rate again
-    elif receipts <= 1500:
-        receipt_amount = 100 * 0.8 + 400 * 0.2 + 500 * 0.4 + (receipts - 1000) * 0.3
-    else:
-        # Heavy penalty for very high receipts
-        receipt_amount = 100 * 0.8 + 400 * 0.2 + 500 * 0.4 + 500 * 0.3 + (receipts - 1500) * 0.1
-    
-    total = base_per_diem + mileage_amount + receipt_amount
-    
-    # Duration-based adjustments based on error analysis
-    if days == 1:
-        total *= 1.1  # 1-day trips seem to get bonuses
-    elif days == 2:
-        total *= 1.05
-    elif days >= 10:
-        total *= 0.9  # Long trips get penalties
-    
-    # Efficiency adjustments
-    if days > 0:
-        miles_per_day = miles / days
-        if miles_per_day < 50:
-            total += 30  # Low mileage bonus
-        elif miles_per_day > 200:
-            total -= 20  # High mileage penalty
-    
-    return round(max(total, 50), 2)
+        # Fallback to improved hand-crafted model based on ML insights
+        # The ML model showed interaction effects are very important
+        
+        # Base components
+        base_amount = 50 * days  # Low base
+        mileage_amount = 0.3 * miles  # Lower mileage rate
+        
+        # Receipt handling - non-linear based on ML insights  
+        if receipts <= 500:
+            receipt_amount = receipts * 0.4
+        elif receipts <= 1000:
+            receipt_amount = 500 * 0.4 + (receipts - 500) * 0.6
+        else:
+            receipt_amount = 500 * 0.4 + 500 * 0.6 + (receipts - 1000) * 0.3
+        
+        # Interaction effects (most important from ML)
+        interaction_1 = (days * miles) * 0.02  # days*miles was important
+        interaction_2 = (days * receipts) * 0.001  # days*receipts was important
+        interaction_3 = (receipts * receipts) * 0.00001  # receipts² was important
+        
+        total = base_amount + mileage_amount + receipt_amount + interaction_1 + interaction_2 + interaction_3
+        
+        # 5-day bonus (was flagged as important)
+        if days == 5:
+            total += 50
+            
+        # Small receipt penalty
+        if receipts < 50:
+            total -= 30
+            
+        return round(max(total, 50), 2)
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:
