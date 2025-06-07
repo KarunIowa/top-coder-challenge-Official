@@ -14,3 +14,36 @@ Progress: 600/1000 cases processed...
 Progress: 700/1000 cases processed...
 Progress: 800/1000 cases processed...
 Progress: 900/1000 cases processed...
+✅ Evaluation Complete!
+
+📈 Results Summary:
+  Total test cases: 1000
+  Successful runs: 1000
+  Exact matches (±$0.01): 80 (8.0%)
+  Close matches (±$1.00): 80 (8.0%)
+  Average error: $226.13
+  Maximum error: $1021.39
+
+🎯 Your Score: 22705.00 (lower is better)
+
+📚 Keep analyzing the patterns in the interviews and test cases.
+
+💡 Tips for improvement:
+  Check these high-error cases:
+    Case 520: 14 days, 481 miles, $939.99 receipts
+      Expected: $877.17, Got: $1898.56, Error: $1021.39
+    Case 793: 13 days, 1186 miles, $2462.26 receipts
+      Expected: $1906.35, Got: $2881.15, Error: $974.80
+    Case 304: 14 days, 1184 miles, $2269.89 receipts
+      Expected: $1943.24, Got: $2898.30, Error: $955.06
+    Case 971: 14 days, 1158 miles, $2104.61 receipts
+      Expected: $1899.69, Got: $2820.69, Error: $921.00
+    Case 548: 8 days, 482 miles, $1411.49 receipts
+      Expected: $631.81, Got: $1548.34, Error: $916.53
+
+📝 Next steps:
+  1. Fix any script errors shown above
+  2. Ensure your run.sh outputs only a number
+  3. Analyze the patterns in the interviews and public cases
+  4. Test edge cases around trip length and receipt amounts
+  5. Submit your solution via the Google Form when ready!
